@@ -30,9 +30,9 @@ from app.models import (
     PairRequestModel,
 )
 from app.settings import settings
-from dredd.bdp import BDPVectorized
+from app.algorithm import BayesianDecisionProcess
 
-logger = logging.getLogger("uvicorn")
+logger = logging.getLogger(__name__)
 app = FastAPI()
 
 snapshot_lock = threading.Lock()
@@ -58,8 +58,8 @@ class JudgingAPI:
         snapshot = self.snapshots.load()
         if snapshot is not None:
             timestamp, bdp_instance = snapshot
-            self.BDP = bdp_instance
-            self.wal.replay(timestamp, self.BDP)
+            self.bdp = bdp_instance
+            self.wal.replay(timestamp, self.bdp)
             self.enabled = True
 
     def get_enabled(self) -> bool:
@@ -76,7 +76,7 @@ class JudgingAPI:
             self.wal.clear()
 
             self.entities.load(entity_csv)
-            self.BDP = BDPVectorized(K=len(self.entities))
+            self.bdp = BayesianDecisionProcess(K=len(self.entities))
 
         self.enabled = True
 
@@ -101,7 +101,7 @@ class JudgingAPI:
         if not force and judge in self.assignments:
             i, j = self.assignments[judge]
         else:
-            i, j = self.BDP.get_next_pair()
+            i, j = self.bdp.get_next_pair()
             self.assignments[judge] = (i, j)
 
         response_entity_i = EntityWithId(**self.entities[i].dict(), id=i)
@@ -123,12 +123,12 @@ class JudgingAPI:
         if winner_id not in (entity_id_1, entity_id_2):
             raise IncorrectPairFormatException()
 
-        self.BDP.submit_comparison(entity_id_1, entity_id_2, winner_id)
+        self.bdp.submit_comparison(entity_id_1, entity_id_2, winner_id)
         del self.assignments[judge]
 
     def get_rankings(self):
         if self.enabled:
-            sorted_indices = np.flip(np.argsort(self.BDP.get_alphas()))
+            sorted_indices = np.flip(np.argsort(self.bdp.get_alphas()))
             entities = self.entities.to_list()
             return [entities[i] for i in sorted_indices]
         else:
@@ -151,7 +151,7 @@ def snapshot(request, call_next):
             if snapshot_counter >= settings.SNAPSHOT_INTERVAL:
                 snapshot_counter = 0
                 logger.info("Taking snapshot")
-                api.snapshots.record(api.BDP)
+                api.snapshots.record(api.bdp)
 
     return call_next(request)
 

@@ -4,14 +4,14 @@ import json
 import logging
 import time
 
-from dredd import bdp
+from app.algorithm import BayesianDecisionProcess
 
 from app.entity import Entity
 from app.models import ComparisonInputModel, PairRequestModel
 from app.db import db, EntityTable, WriteAheadTable, SnapshotTable, AssignmentTable
 from app.settings import settings
 
-logger = logging.getLogger("uvicorn")
+logger = logging.getLogger(__name__)
 
 
 class EntityAdapter:
@@ -52,7 +52,7 @@ class SnapshotAdapter:
         db.drop_tables([SnapshotTable], safe=True)
         db.create_tables([SnapshotTable], safe=True)
 
-    def record(self, bdp_instance: bdp.BDPVectorized):
+    def record(self, bdp_instance: BayesianDecisionProcess):
         with db.atomic():
             SnapshotTable.create(
                 bdp=bdp_instance.model_dump_json(), timestamp=time.time()
@@ -66,12 +66,12 @@ class SnapshotAdapter:
 
             SnapshotTable.delete().where(SnapshotTable.id.in_(subquery)).execute()
 
-    def load(self) -> Tuple[int, bdp.BDPVectorized] | None:
+    def load(self) -> Tuple[int, BayesianDecisionProcess] | None:
         record = SnapshotTable.select().order_by(SnapshotTable.timestamp.desc()).first()
 
         if record is not None:
             timestamp = record.timestamp
-            algo = bdp.BDPVectorized(**json.loads(record.bdp))
+            algo = BayesianDecisionProcess(**json.loads(record.bdp))
             return (timestamp, algo)
         else:
             return None
@@ -129,7 +129,7 @@ class WriteAheadAdapter:
             event=event_type, timestamp=time.time(), params=log_data.model_dump_json()
         )
 
-    def replay(self, snapshot_time: int, bdp_instance: bdp.BDPVectorized) -> None:
+    def replay(self, snapshot_time: int, bdp_instance: BayesianDecisionProcess) -> None:
         records = (
             WriteAheadTable.select()
             .where(WriteAheadTable.timestamp > snapshot_time)
