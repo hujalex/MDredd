@@ -29,7 +29,7 @@ from app.models import (
     RankingsResponseModel,
     PairRequestModel,
 )
-from app import constants
+from app.settings import settings
 from dredd.bdp import BDPVectorized
 
 logger = logging.getLogger("uvicorn")
@@ -148,7 +148,7 @@ def snapshot(request, call_next):
             global snapshot_counter
             snapshot_counter += 1
 
-            if snapshot_counter >= constants.SNAPSHOT_INTERVAL:
+            if snapshot_counter >= settings.SNAPSHOT_INTERVAL:
                 snapshot_counter = 0
                 logger.info("Taking snapshot")
                 api.snapshots.record(api.BDP)

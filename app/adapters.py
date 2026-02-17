@@ -9,7 +9,7 @@ from dredd import bdp
 from app.entity import Entity
 from app.models import ComparisonInputModel, PairRequestModel
 from app.db import db, EntityTable, WriteAheadTable, SnapshotTable, AssignmentTable
-from app.constants import MAX_SNAPSHOTS
+from app.settings import settings
 
 logger = logging.getLogger("uvicorn")
 
@@ -61,7 +61,7 @@ class SnapshotAdapter:
             subquery = (
                 SnapshotTable.select(SnapshotTable.id)
                 .order_by(SnapshotTable.id.asc())
-                .offset(MAX_SNAPSHOTS)
+                .offset(settings.MAX_SNAPSHOTS)
             )
 
             SnapshotTable.delete().where(SnapshotTable.id.in_(subquery)).execute()
